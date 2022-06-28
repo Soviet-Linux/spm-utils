@@ -1,0 +1,32 @@
+#!/bin/env python3
+import os
+import shutil
+import json
+
+archivePath = input("Package location : ")
+if not os.path.exists(archivePath):
+    print("Package location does not exist")
+    exit()
+newVersion = input("New version : ")
+if not newVersion:
+    print("New version is empty")
+    exit()
+newSources = input("New sources : ")
+temp = "/tmp/spm.tmp/"
+PName = archivePath.split("/")[-1].split(".")[0]
+print(PName)
+os.mkdir(temp)
+os.system("tar -xvf %s -C %s" % (archivePath, temp))
+spm = open(temp + PName + ".spm")
+spmJson = spm.read()
+print(spmJson)
+parsedSpm = json.loads(spmJson)
+oldVersion = parsedSpm["version"]
+parsedSpm["version"] = newVersion
+spm.close()
+shutil.rmtree(temp + PName + "-" + oldVersion)
+os.system("tar -xvf %s -C %s" % (newSources, temp))
+os.remove(archivePath)
+makeCommand = "tar -cvf %s -C %s " % (archivePath, temp)
+os.system(makeCommand)
+shutil.rmtree(temp)
