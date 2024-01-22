@@ -1,2 +1,2 @@
 #!/bin/bash
-docker run -it --rm -v "$(pwd):$(pwd)" -w "$(pwd)" ghcr.io/soviet-linux/soviet:latest bash -c "cccp --update && cccp --overwrite -pkg "$(realpath "$1")""
+docker run -it --rm -v $(pwd):$(pwd) -w $(pwd) ghcr.io/soviet-linux/soviet:latest bash -c "cccp --update && cccp --overwrite -pkg $(realpath "$1")"
