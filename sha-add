@@ -1,0 +1,77 @@
+import os
+import sys
+import requests
+import hashlib
+import re
+from urllib.parse import urlparse
+from urllib.request import urlopen
+
+def fetch_and_hash(url, output_dir):
+    parsed_url = urlparse(url)
+    if parsed_url.scheme == 'ftp':
+        with urlopen(url) as response:
+            content = response.read()
+    else:
+        response = requests.get(url)
+        if response.status_code != 200:
+            print(f"Failed to fetch {url}. Exiting.")
+            exit(1)
+        content = response.content
+
+    filename = os.path.join(output_dir, os.path.basename(parsed_url.path))
+    with open(filename, 'wb') as f:
+        f.write(content)
+
+    sha256_hash = hashlib.sha256()
+    with open(filename, 'rb') as f:
+        [sha256_hash.update(chunk) for chunk in iter(lambda: f.read(8192), b'')]
+
+    return sha256_hash.hexdigest(), filename
+
+def update_file(input_file, output_dir='/tmp/'):
+    with open(input_file, 'r') as f:
+        content = f.read()
+
+    # Extract URL, NAME, and VERSION from the content
+    url_match = re.search(r'url\s*=\s*(.*)', content)
+    name_match = re.search(r'name\s*=\s*(\S+)', content)
+    version_match = re.search(r'version\s*=\s*(\S+)', content)
+    sha256_match = re.search(r'sha256\s*=\s*(\S+)', content)
+
+    if not (url_match and name_match and version_match):
+        print("URL, NAME, or VERSION not found in the input file. Exiting.")
+        exit(1)
+
+    url = url_match.group(1).strip()
+    name = name_match.group(1).strip()
+    version = version_match.group(1).strip()
+
+    # Replace $NAME and $VERSION in the URL
+    url = url.replace('$NAME', name).replace('$VERSION', version)
+
+    # Fetch and hash the file
+    sha256_hash, filename = fetch_and_hash(url, output_dir)
+
+    # If sha256 line doesn't exist, add it below the url
+    if not sha256_match:
+        url_line = re.search(r'url\s*=\s*\S+', content).group(0)
+        updated_content = content.replace(url_line, f'{url_line}\nsha256 = {sha256_hash}')
+    else:
+        updated_content = content
+
+    # Write the updated content back to the input file
+    with open(input_file, 'w') as f:
+        f.write(updated_content)
+
+    print(f"SHA256 hash added to {input_file}.")
+    print(f"Downloaded file saved to: {filename}")
+
+    # Delete the downloaded file
+    os.remove(filename)
+    print(f"Downloaded file deleted.")
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: python script.py <input_file>")
+        exit(1)
+    update_file(sys.argv[1])
